@@ -8,7 +8,7 @@ from jax.scipy.stats import multivariate_normal
 from functions import F_P, GradientKernel,KernelGradientDiscrepancy
 from jax import random
 import time
-
+import os
 
 
 
@@ -23,33 +23,28 @@ class MeanFieldLangevinDynamics:
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X)) # 
         self.k = k
 
-        self.F_P = F_P(self.q0, self.L)
-        self.k_pq = GradientKernel(self.S_PQ, self.k)
-        self.KGD = KernelGradientDiscrepancy(self.k_pq)
-
-
-    def run_particles(self,eta,T,X0,noise = 0):###@
-        n,d = X0.shape
-        KGD_values = jnp.zeros(T)
-        F_P_values = jnp.zeros(T)
-        all_particles = jnp.zeros((T, n, d))
-
+    def run_particles(self, eta, T, X0, key, noise=0,save_data_name = None):
+        n, d = X0.shape
+        
+        device = X0.device  
+        all_particles = jax.device_put(jnp.zeros((T, n, d)), device)
         X = X0.copy()
+
+        keys_tab = random.split(key, T)
         for it in range(T):
-            Z = random.normal(random.PRNGKey(it), shape=(n,d))  
-            eps = random.normal(random.PRNGKey(it+ 1000), shape=(n,d))
-            X = X + eta * self.S_PQ(X) + jnp.sqrt(2*eta)* Z # + 1/2**(it//100) * noise * eps)
-            
-            
-            KGD_values = KGD_values.at[it].set(self.KGD.evaluate(X))
+            key, subkey = random.split(keys_tab[it])
+            Z = random.normal(subkey, shape=(n, d))
+
+            X = X + eta * self.S_PQ(X) + jnp.sqrt(2 * eta) * Z
             all_particles = all_particles.at[it].set(X)
-            F_P_values = F_P_values.at[it].set(jit(self.F_P.evaluate)(X))
 
+        # if save_data_name != None:
+        #     save_dir = "saved_data/mfld"
+        #     os.makedirs(save_dir, exist_ok=True)    
+        #     save_path = os.path.join(save_dir, save_data_name)
+        #     jnp.save(save_path, all_particles[jnp.arange(0,T,100)])
 
-            # if it % 10 ==0:
-            #     plt.figure()
-            #     plt.scatter(all_particles[it,:,0],all_particles[it,:,0])
-        return KGD_values, F_P_values, all_particles
+        return all_particles
 
 
 
