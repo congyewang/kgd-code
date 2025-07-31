@@ -7,10 +7,11 @@ from jax.scipy.stats import multivariate_normal
 from functions import F_P, GradientKernel,KernelGradientDiscrepancy
 import jax_kernels as jk
 import jax
+from jax import random
 
 
 class GeneralizedSVGD:
-    def __init__(self,q0,L,k,l,dl):
+    def __init__(self,q0,L,k,m,dm):
         self.q0 = q0
         self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
         self.S_q0 = jit(vmap(grad(self.log_q0)))
@@ -18,27 +19,21 @@ class GeneralizedSVGD:
         self.gradL = jit(grad(lambda X : jax.lax.stop_gradient(len(X)) * self.L(X)))
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X)) # 
         self.k = k
-        self.l = l
-        self.dl = dl
-
-
-        self.F_P = F_P(self.q0, self.L)
-        self.k_pq = GradientKernel(self.S_PQ, self.k)
-        self.KGD = KernelGradientDiscrepancy(self.k_pq)
+        self.m = m
+        self.dm = dm
     
     def run_particles(self, eta, T, X0):
         n, d = X0.shape
-            
-        KGD_values = jnp.zeros(T)
-        F_P_values = jnp.zeros(T)
-        all_particles = jnp.zeros((T, n, d))
-
+        
+        device = X0.device  
+        all_particles = jax.device_put(jnp.zeros((T, n, d)), device)
         X = X0.copy()
+
+        #keys_tab = random.split(key, T)
         for it in range(T):
-            phi = 1/n * (self.l(X,X) @ self.S_PQ(X) + jnp.sum(self.dl(X,X),axis = 0))
+            #key, subkey = random.split(keys_tab[it])
+            phi = 1/n * (self.m(X,X) @ self.S_PQ(X) + jnp.sum(self.dm(X,X),axis = 0))
             X = X + eta * phi
-            
-            KGD_values = KGD_values.at[it].set(self.KGD.evaluate(X))
             all_particles = all_particles.at[it].set(X)
-            F_P_values = F_P_values.at[it].set(self.F_P.evaluate(X))
-        return KGD_values, F_P_values, all_particles
+
+        return all_particles
