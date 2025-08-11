@@ -22,23 +22,27 @@ class ExtensibleSampling:
         self.k_pq = GradientKernel(self.S_PQ, self.k)
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
 
-    def grid_search(self,X,l,u,grid_size):
+    def grid_search(self,X,l,u,n0,it):
         n, d = X.shape
-        axis = jnp.linspace(l, u, grid_size)
+        n_grid = n0 + int(jnp.sqrt(it))
+        axis = jnp.linspace(l, u, n_grid)
         meshes = jnp.meshgrid(*[axis]*d, indexing="ij")
         grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d)
-        KGD_grid = jnp.zeros(grid_size**d)
-        for i in range(grid_size**d):
-                KGD_grid = KGD_grid.at[i].set(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
+        KGD_grid = jnp.zeros(n_grid**d)
+        for i in range(n_grid**d):
+            KGD_grid = KGD_grid.at[i].set(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
         min_idx = jnp.argmin(KGD_grid)
         return grid_points[min_idx]
+    
+    #def MonteCarlo(self):
+         
         
 
-    def run_particles(self,x0,T,l = -5,u = 5,gris_size = 100):
+    def run_particles(self,x0,T,l = -5,u = 5,n0 = 100):
         d = len(x0)
         X = jnp.zeros((T, d))
         X = X.at[0].set(x0)
-        for it in range(T):
+        for it in range(T-1):
             print("Iteration:", it)
-            X = X.at[it].set(self.grid_search(X[:it], l, u, gris_size))
+            X = X.at[it+1].set(self.grid_search(X[:it], l, u, n0, it))
         return X                        

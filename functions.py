@@ -20,31 +20,50 @@ class GradientKernel:
         self.d2k = jit(jacfwd(self.dky, argnums=0))
 
         self.K = lambda X : vmap(lambda x: vmap(lambda y: self.k(x, y))(X))(X)
-        self.dKx = lambda X : vmap(lambda x: vmap(lambda y: self.dkx(x, y))(X))(X)
+        self.dK1 = lambda X : vmap(lambda x: vmap(lambda y: self.dkx(x, y))(X))(X)
         self.d2K = lambda X : vmap(lambda x: vmap(lambda y: jnp.trace(self.d2k(x, y)))(X))(X)
 
+        #for extensible sampling
+        self.Kx = lambda X,x : vmap(lambda y: self.k(x, y))(X)
+        self.dK1x = lambda X,x : vmap(lambda y: self.dkx(x, y))(X)
+        self.dK2x = lambda X,x : vmap(lambda y : self.dky(x, y))(X)
+        self.d2Kx = lambda X,x : vmap(lambda y: jnp.trace(self.d2k(x, y)))(X)
 
-    def evaluate(self,X):
+
+    def gram_matrix(self,X): #Gram_matrix
         K = self.K(X)
-        dK = self.dKx(X)
+        dK = self.dK1(X)
         d2K = self.d2K(X)
         S_PQ = self.S_PQ(X)
         S_dK = jnp.einsum('ijk, ijk -> ij', dK, (S_PQ[None, :, :]))
         #S_dK = jnp.einsum('ijk, ijk -> ij', dK, (S_PQ[None, :, :] - S_PQ[:, None, :]))
         k_pq = d2K + S_dK + S_dK.T + K * jnp.dot(S_PQ, S_PQ.T)
         return k_pq
-
+    
+    #for extansible sampling
+    def kernel_array(self,X):
+        n = len(X)
+        S_PQ = self.S_PQ(X)
+        Y = X[:n-1]
+        x = X[n-1]
+        return self.Kx(Y,x).T @ (S_PQ[:n-1] @ S_PQ[n-1]) + self.d2Kx(Y,x) + jnp.sum(self.dK1x(Y,x)* S_PQ[:n-1],axis = 1) + jnp.sum(self.dK2x(Y,x)* S_PQ[n-1],axis = 1) 
+    def kernel_function(self,X): # k_PQ(x,x))
+        n = len(X)
+        S_PQ = self.S_PQ(X)
+        x = X[n-1]
+        return self.k(x,x) * jnp.dot(S_PQ[n-1],S_PQ[n-1]) + jnp.trace(self.d2k(x,x)) + jnp.dot(self.dkx(x,x), S_PQ[n-1]) + jnp.dot(self.dky(x,x), S_PQ[n-1]) 
 
 
 
 class KernelGradientDiscrepancy:
     def __init__(self, k_pq):
-        self.k_pq = jit(k_pq.evaluate)
+        self.K_pq = jit(k_pq.gram_matrix)
+        self.k_pq = k_pq
         #self.vfk0 = jit(vmap(k0.evaluate, in_axes=(None, 0, 0)))
 
     def evaluate(self, X):
         n = len(X)
-        K_pq = self.k_pq(X)
+        K_pq = self.K_pq(X)
         sum = 1/n * jnp.sqrt(jnp.sum(K_pq))
         return sum
     
@@ -58,9 +77,15 @@ class KernelGradientDiscrepancy:
         samples = jax.device_put(samples, X.device)
         return self.evaluate(samples)
 
-        
+    #for extansible sampling 
+    def minimized_function(self,X):
+        n = len(X)
+        #print(self.k_pq.kernel_function(X)/2 )+ jnp.sum(self.k_pq.kernel_array(X)))
+        return self.k_pq.kernel_function(X)/2 + jnp.sum(self.k_pq.kernel_array(X)) 
+
 
         
+     
 class F_P:
     def __init__(self, q0, L):
         self.q0 = q0
