@@ -24,22 +24,22 @@ class VariationalInference:
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
 
 
-    def init_params(self,key, hidden_dim1=5,hidden_dim2=3):
+    def init_params(self,key, hidden_dim1=10,hidden_dim2= 2):
         rng1, rng2,rng3,rng4,rng5,rng6 = random.split(key,6)
         params = {
             'W1': (random.uniform(rng1, (hidden_dim1, self.d))) * 1.0,
             'b1': random.normal(rng4, (hidden_dim1,)),
             'W2': (random.uniform(rng2, (hidden_dim2, hidden_dim1))) * 1.0,
-            'b2': random.normal(rng3, (hidden_dim2,)),
-            'W3' : (random.uniform(rng5, (self.d, hidden_dim2))) * 1.0,
-            'b3' : random.normal(rng6, (self.d,))
+            'b2': random.normal(rng3, (hidden_dim2,))
+            # 'W3' : (random.uniform(rng5, (self.d, hidden_dim2))) * 1.0,
+            # 'b3' : random.normal(rng6, (self.d,))
         }
         return params
 
     def forward(self,params, w):
         h1 = jnp.tanh(jnp.dot(params['W1'], w) + params['b1'])  # hidden layer
-        h2 = jnp.tanh(jnp.dot(params['W2'], h1) + params['b2'])  # hidden layer
-        y = jnp.dot(params['W3'], h2) + params['b3']             
+        #h2 = jnp.tanh(jnp.dot(params['W2'], h1) + params['b2'])  # hidden layer
+        y = jnp.dot(params['W2'], h1) + params['b2']             
         return y.squeeze()
 
     def model(self,theta,W):
@@ -65,7 +65,6 @@ class VariationalInference:
                 key = Keys[it]
                 DF = jit(grad(lambda theta : self.F(theta, key, n_sim, self.d)))
                 theta = theta - eta * DF(theta)
-                print(theta)
                 Theta = Theta.at[it].set(theta)
             return Theta
 

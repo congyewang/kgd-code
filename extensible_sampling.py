@@ -47,6 +47,7 @@ class ExtensibleSampling:
         X = jnp.zeros((T, d))
         X = X.at[0].set(x0)
         for it in range(1,T):
-            print("Iteration:", it)
+            if it % 10 == 0:
+                print("Iteration:", it)
             X = X.at[it].set(self.grid_search(X[:it], l, u, n0, it))
         return X                        
