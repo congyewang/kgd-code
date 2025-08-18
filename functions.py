@@ -7,6 +7,7 @@ from jax.scipy.stats import gaussian_kde
 from jax import random
 import jax
 import time
+from flax import linen as nn
 
 
 
@@ -121,6 +122,25 @@ class F_P:
         return self.L(X) + KL
     
     
+class MLP(nn.Module):
+    hidden_dims: list[int]   
+    output_dim: int    
+    activation_function : str = "tanh"
+
+    @nn.compact
+    def __call__(self, x):
+        
+        for hdim in self.hidden_dims:
+            x = nn.Dense(hdim)(x)
+            if self.activation_function == "relu":
+                x = nn.relu(x)
+            elif self.activation_function == "tanh":
+                x = jnp.tanh(x)
+            elif self.activation_function == "sigmoid":
+                x = nn.sigmoid(x)
+
+        x = nn.Dense(self.output_dim)(x)
+        return x.squeeze()
         
 
 
