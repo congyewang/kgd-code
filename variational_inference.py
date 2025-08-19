@@ -57,7 +57,41 @@ class VariationalInference:
         self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
         self.optimizer = nnx.Optimizer(self.model_T, optax.adam(1e-3), wrt=nnx.Param)
 
-        # key = random.PRNGKey(0)
+
+    def flatten_params(self,params):
+        leaves, _ = jax.tree_util.tree_flatten(params)
+        flat = jnp.concatenate([jnp.ravel(p) for p in leaves])
+        return flat
+
+    #@nnx.jit 
+    def train_step(self,model_T, optimizer, W):
+        def loss_fn(model_T):
+            X = vmap(lambda w : model_T(w))(W)
+            return self.KGD.evaluate(X) #+ 1/1000 * self.L(X)
+
+        loss, grads = nnx.value_and_grad(loss_fn)(model_T)
+        self.optimizer.update(grads)  # in-place updates
+        params = nnx.state(model_T, nnx.Param)
+        return  self.flatten_params(params),loss #
+    
+    def run(self,T,key,n_sim = 100):
+        Keys = random.split(key, T)
+        params = nnx.state(self.model_T, nnx.Param)
+        flat_param0 = self.flatten_params(params)
+        dim_theta = flat_param0.shape[0]
+        Theta = jnp.zeros((T,dim_theta ))
+        Loss = jnp.zeros((T,))
+        for it in range(T):
+            print(it)
+            key = Keys[it]
+            W = random.normal(key, shape=(n_sim, self.d))
+            theta,loss = self.train_step(self.model_T, self.optimizer, W)
+            Theta = Theta.at[it].set(theta)
+            Loss = Loss.at[it].set(loss)
+        return Theta, Loss
+            
+
+# key = random.PRNGKey(0)
         # params = self.model_T.init(key, jnp.zeros((self.d,)))  
         # self.unravel_fn = ravel_pytree(params)[1]
 
@@ -72,38 +106,6 @@ class VariationalInference:
     #         flat_list.extend(jnp.ravel(v).tolist())  
         
     #     return jnp.array(flat_list)
-
-    def flatten_params(self,params):
-        leaves, _ = jax.tree_util.tree_flatten(params)
-        flat = jnp.concatenate([jnp.ravel(p) for p in leaves])
-        return flat
-
-    #@nnx.jit  # automatic state management for JAX transforms
-    def train_step(self,model_T, optimizer, W):
-        def loss_fn(model_T):
-            X = vmap(lambda w : model_T(w))(W)
-            return self.KGD.evaluate(X)
-
-        loss, grads = nnx.value_and_grad(loss_fn)(model_T)
-        self.optimizer.update(grads)  # in-place updates
-        params = nnx.state(model_T, nnx.Param)
-        return self.flatten_params(params) #jnp.ones(self.d)#self.flatten_params_to_array(model_T)
-    
-    def run(self,T,key,n_sim = 100):
-        Keys = random.split(key, T)
-        params = nnx.state(self.model_T, nnx.Param)
-        flat_param0 = self.flatten_params(params)
-        dim_theta = flat_param0.shape[0]
-        Theta = jnp.zeros((T,dim_theta ))
-        for it in range(T):
-            key = Keys[it]
-            W = random.normal(key, shape=(n_sim, self.d))
-            theta = self.train_step(self.model_T, self.optimizer, W)
-            Theta = Theta.at[it].set(theta)
-        return Theta
-            
-
-
     
     # def push_T_theta(self,theta,W):
     #      param = self.unravel_fn(theta)

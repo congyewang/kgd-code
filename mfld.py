@@ -24,6 +24,7 @@ class MeanFieldLangevinDynamics:
         self.k = k
 
     def run_particles(self, eta, T, X0, key, noise=0,save_data_name = None):
+    
         n, d = X0.shape
         
         device = X0.device  
