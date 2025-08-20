@@ -24,11 +24,11 @@ class ExtensibleSampling:
 
     def grid_search(self,X,l,u,n0,it):
         n, d = X.shape
-        n_grid = n0 + int(jnp.sqrt(it))
+        n_grid = n0 #+ int(jnp.sqrt(it))
         axis = jnp.linspace(l, u, n_grid)
         #print(axis)
         meshes = jnp.meshgrid(*[axis]*d, indexing="ij")
-        grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d) + 0.01 * random.normal(jax.random.PRNGKey(it), shape=(n_grid**d, d))  # Adding small noise to avoid exact duplicates
+        grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d) + 1 * random.normal(jax.random.PRNGKey(it), shape=(n_grid**d, d))  # Adding small noise to avoid exact duplicates
         KGD_grid = jnp.zeros(n_grid**d)
         for i in range(n_grid**d):
             #print(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
@@ -38,16 +38,26 @@ class ExtensibleSampling:
     
     #def MonteCarlo_search(self):
 
-    #def GD_search(self,X):
-         
+    def GD_search(self,X,N_it=500,step_size=0.01):
+        Loss = lambda x : self.KGD.evaluate(jnp.concatenate((X, x[None,:]), axis=0))
         
+        DLoss = jit(grad(Loss))
+        x0 = jnp.mean(X, axis=0)
+        x = x0
+        for it in range(N_it):
+            x = x - step_size * DLoss(x)
+        return x
 
-    def run_particles(self,x0,T,l = -3,u = 3,n0 = 100):
+
+    def run_particles(self,x0,T,min_research = "grid_search",l = -5,u = 5,n0 = 10):
         d = len(x0)
         X = jnp.zeros((T, d))
         X = X.at[0].set(x0)
         for it in range(1,T):
             if it % 10 == 0:
                 print("Iteration:", it)
-            X = X.at[it].set(self.grid_search(X[:it], l, u, n0, it))
+            if min_research == "grid_search":
+                X = X.at[it].set(self.grid_search(X[:it], l, u, n0, it))
+            if min_research == "GD search":
+                X = X.at[it].set(self.GD_search(X[:it]))
         return X                        
