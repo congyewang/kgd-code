@@ -33,15 +33,21 @@ class MLP(nnx.Module):
 
     def __call__(self, x):
         for layer in self.layers:
-            x = layer(x)
             if self.activation == "relu":
                 x = nnx.relu(x)
             elif self.activation == "tanh":
                 x = jnp.tanh(x)
             elif self.activation == "sigmoid":
                 x = nnx.sigmoid(x)
+            elif self.activation == "elu":
+                x = nnx.elu(x)
+            
+            x = layer(x)
+
 
         return self.out(x)
+
+
 
 class VariationalInference:
     def __init__(self, q0, L, k,d,layers,activation_function):
@@ -55,7 +61,7 @@ class VariationalInference:
         self.k_pq = GradientKernel(self.S_PQ, k)
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
         self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
-        self.optimizer = nnx.Optimizer(self.model_T, optax.adam(1e-1), wrt=nnx.Param)
+        self.optimizer = nnx.Optimizer(self.model_T, optax.adam(1e-3), wrt=nnx.Param)
 
 
     def flatten_params(self,params):

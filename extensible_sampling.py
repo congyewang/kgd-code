@@ -25,20 +25,41 @@ class ExtensibleSampling:
     def grid_search(self,X,l,u,n0,it):
         n, d = X.shape
         n_grid = n0 #+ int(jnp.sqrt(it))
-        axis = jnp.linspace(l, u, n_grid)
-        #print(axis)
-        meshes = jnp.meshgrid(*[axis]*d, indexing="ij")
-        grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d) + 1 * random.normal(jax.random.PRNGKey(it), shape=(n_grid**d, d))  # Adding small noise to avoid exact duplicates
-        KGD_grid = jnp.zeros(n_grid**d)
-        for i in range(n_grid**d):
-            #print(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
-            KGD_grid = KGD_grid.at[i].set(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
-        min_idx = jnp.argmin(KGD_grid)
+        if it <= 30:
+            axis = jnp.linspace(l, u, n_grid)
+            #print(axis)
+            meshes = jnp.meshgrid(*[axis]*d, indexing="ij")
+            grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d) + 1 * random.normal(jax.random.PRNGKey(it), shape=(n_grid**d, d))  # Adding small noise to avoid exact duplicates
+            KGD_grid = jnp.zeros(n_grid**d)
+            for i in range(n_grid**d):
+                KGD_grid = KGD_grid.at[i].set(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
+            min_idx = jnp.argmin(KGD_grid)
+        else:
+            n_samples =  10000
+            delta = 1.0
+            key = jax.random.PRNGKey(it)
+
+            # choisir aléatoirement quelles composantes de la mixture (i.e. quel point de X)
+            comp_idx = random.randint(key, (n_samples,), minval=0, maxval=n)
+            means = X[comp_idx]  # (n_samples, d)
+
+            # bruit gaussien isotrope
+            noise = jnp.sqrt(delta) * random.normal(key, (n_samples, d))
+
+            grid_points = means + noise  # (n_samples, d)
+
+            # évaluer le critère sur chaque point
+            KGD_grid = jnp.zeros(n_samples)
+            for i in range(n_samples):
+                KGD_grid = KGD_grid.at[i].set(
+                    self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None, :]), axis=0))
+                )
+            min_idx = jnp.argmin(KGD_grid)
         return grid_points[min_idx]
     
-    #def MonteCarlo_search(self):
+    
 
-    def GD_search(self,X,N_it=500,step_size=0.01):
+    def GD_search(self,X,N_it=5000,step_size=0.01):
         Loss = lambda x : self.KGD.evaluate(jnp.concatenate((X, x[None,:]), axis=0))
         
         DLoss = jit(grad(Loss))
