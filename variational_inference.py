@@ -50,7 +50,7 @@ class MLP(nnx.Module):
 
 
 class VariationalInference:
-    def __init__(self, q0, L, k,d,layers,activation_function):
+    def __init__(self, q0, L, k,d,layers,activation_function,learning_rate = 1e-3):
         self.d = d
         self.q0 = q0
         self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
@@ -60,7 +60,13 @@ class VariationalInference:
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X))
         self.k_pq = GradientKernel(self.S_PQ, k)
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
-        self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
+        #self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
+        self.model_T = MLP(self.d, layers, self.d, activation_function, rngs=nnx.Rngs(0))
+
+        # # Multiplier tous les paramètres par 10
+        # params = nnx.state(self.model_T, nnx.Param)
+        # scaled_params = jax.tree_map(lambda p: p * 5, params)
+        # nnx.update(self.model_T, scaled_params)
         self.optimizer = nnx.Optimizer(self.model_T, optax.adam(1e-3), wrt=nnx.Param)
 
 
@@ -97,3 +103,7 @@ class VariationalInference:
             Loss = Loss.at[it].set(loss)
         return Theta, Loss
             
+
+
+
+
