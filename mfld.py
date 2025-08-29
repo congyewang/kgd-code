@@ -26,7 +26,7 @@ class MeanFieldLangevinDynamics:
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X)) # 
         self.k = k
 
-    def run_particles(self, eta, T, X0, key, noise=0,save_data_name = None):
+    def run_particles(self, eta, T, X0, key, decrease_step_size = False, noise=0):
     
         n, d = X0.shape
         
@@ -39,6 +39,9 @@ class MeanFieldLangevinDynamics:
             key, subkey = random.split(keys_tab[it])
             Z = random.normal(subkey, shape=(n, d))
 
+            if decrease_step_size:
+                if (it+1) % 200 == 0:
+                    eta = eta /3
             X = X + eta * self.S_PQ(X) + jnp.sqrt(2 * eta) * Z
             all_particles = all_particles.at[it].set(X)
 
