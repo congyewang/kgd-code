@@ -41,7 +41,7 @@ class MeanFieldLangevinDynamics:
 
             if decrease_step_size:
                 if (it+1) % 200 == 0:
-                    eta = eta/4.0
+                    eta = eta/10.0
             X = X + eta * self.S_PQ(X) + jnp.sqrt(2 * eta) * Z
             all_particles = all_particles.at[it].set(X)
 
