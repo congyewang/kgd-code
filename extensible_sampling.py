@@ -39,16 +39,14 @@ class ExtensibleSampling:
             delta = 1.0
             key = jax.random.PRNGKey(it)
 
-            # choisir aléatoirement quelles composantes de la mixture (i.e. quel point de X)
             comp_idx = random.randint(key, (n_samples,), minval=0, maxval=n)
             means = X[comp_idx]  # (n_samples, d)
 
-            # bruit gaussien isotrope
+            
             noise = jnp.sqrt(delta) * random.normal(key, (n_samples, d))
 
             grid_points = means + noise  # (n_samples, d)
 
-            # évaluer le critère sur chaque point
             KGD_grid = jnp.zeros(n_samples)
             for i in range(n_samples):
                 KGD_grid = KGD_grid.at[i].set(
@@ -70,7 +68,7 @@ class ExtensibleSampling:
         return x
 
 
-    def run_particles(self,x0,T,min_research = "grid_search",l = -5,u = 5,n0 = 10):
+    def run_particles(self,x0,T,min_research = "grid_search",l = -5,u = 5,n0 = 20):
         d = len(x0)
         X = jnp.zeros((T, d))
         X = X.at[0].set(x0)
