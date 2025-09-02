@@ -38,8 +38,8 @@ class GeneralizedSVGD:
             #key, subkey = random.split(keys_tab[it])
             phi = 1/n * (self.m(X,X) @ self.S_PQ(X) + jnp.sum(self.dm(X,X),axis = 0))
             if decrease_step_size:
-                if (it+1) % 200 == 0:
-                    eta = eta/10.0
+                if (it+1) % 100 == 0:
+                    eta = eta/2.0
             X = X + eta * phi
             all_particles = all_particles.at[it].set(X)
 
