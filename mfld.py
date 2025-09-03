@@ -25,6 +25,17 @@ class MeanFieldLangevinDynamics:
             self.gradL = gradL
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X)) # 
         self.k = k
+    #     self.k_pq = GradientKernel(self.S_PQ, self.k)
+    #     self.KGD = KernelGradientDiscrepancy(self.k_pq).evaluate
+
+    # def optimize_eta_grid(self, X, Z, etas=jnp.logspace(-6, -3, 10)):
+    #     losses = []
+    #     for eta in etas:
+    #         X_next = X + eta * self.S_PQ(X) + jnp.sqrt(2 * eta) * Z
+    #         losses.append(self.KGD(X_next))
+    #     losses = jnp.array(losses)
+    #     safe_losses = jnp.where(jnp.isnan(losses), jnp.inf, losses)
+    #     return etas[jnp.argmin(safe_losses)]
 
     def run_particles(self, eta, T, X0, key, decrease_step_size = False, noise=0):
     
@@ -40,8 +51,8 @@ class MeanFieldLangevinDynamics:
             Z = random.normal(subkey, shape=(n, d))
 
             if decrease_step_size:
-                if (it+1) % 200 == 0:
-                    eta = eta/5.0
+                if (it+1) % 100 == 0:
+                    eta = eta/4.0
             X = X + eta * self.S_PQ(X) + jnp.sqrt(2 * eta) * Z
             all_particles = all_particles.at[it].set(X)
 
