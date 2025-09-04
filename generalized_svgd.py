@@ -11,10 +11,13 @@ from jax import random
 
 
 class GeneralizedSVGD:
-    def __init__(self,q0,L,k,m,dm,gradL=None):
+    def __init__(self,q0,L,k,m,dm,gradL=None,grad_log_q0 = None):
         self.q0 = q0
-        self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
-        self.S_q0 = jit(vmap(grad(self.log_q0)))
+        if grad_log_q0 != None:
+            self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
+            self.S_q0 = jit(vmap(grad(self.log_q0)))
+        else:
+            self.S_q0 = jit(vmap(grad_log_q0))
         self.L = L
         if gradL == None:
             self.gradL = jit(grad(lambda X : jax.lax.stop_gradient(len(X)) * self.L(X)))

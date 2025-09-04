@@ -14,10 +14,13 @@ import os
 
 
 class MeanFieldLangevinDynamics:
-    def __init__(self,q0,L,k,gradL = None):
+    def __init__(self,q0,L,k,gradL = None,grad_log_q0 = None):
         self.q0 = q0
-        self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
-        self.S_q0 = jit(vmap(grad(self.log_q0)))
+        if grad_log_q0 != None:
+            self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
+            self.S_q0 = jit(vmap(grad(self.log_q0)))
+        else:
+            self.S_q0 = jit(vmap(grad_log_q0))
         self.L = L
         if gradL == None:
             self.gradL = jit(grad(lambda X : jax.lax.stop_gradient(len(X)) * self.L(X)))
@@ -26,7 +29,7 @@ class MeanFieldLangevinDynamics:
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X)) # 
         self.k = k
 
-    def run_particles(self, eta, T, X0, key, decrease_step_size = False, noise=0):
+    def run_particles(self, eta, T, X0, key, decrease_step_size = None, noise=0):
     
         n, d = X0.shape
         
@@ -39,9 +42,9 @@ class MeanFieldLangevinDynamics:
             key, subkey = random.split(keys_tab[it])
             Z = random.normal(subkey, shape=(n, d))
 
-            if decrease_step_size:
+            if decrease_step_size != None:
                 if (it+1) % 100 == 0:
-                    eta = eta/4.0
+                    eta = eta/decrease_step_size
             X = X + eta * self.S_PQ(X) + jnp.sqrt(2 * eta) * Z
             all_particles = all_particles.at[it].set(X)
 
