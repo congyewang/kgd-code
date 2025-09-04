@@ -31,11 +31,8 @@ class GeneralizedSVGD:
         device = X0.device  
         all_particles = jax.device_put(jnp.zeros((T, n, d)), device)
         X = X0.copy()
-        
 
-        #keys_tab = random.split(key, T)
         for it in range(T):
-            #key, subkey = random.split(keys_tab[it])
             phi = 1/n * (self.m(X,X) @ self.S_PQ(X) + jnp.sum(self.dm(X,X),axis = 0))
             if decrease_step_size:
                 if (it+1) % 100 == 0:

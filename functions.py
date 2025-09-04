@@ -37,7 +37,6 @@ class GradientKernel:
         d2K = self.d2K(X)
         S_PQ = self.S_PQ(X)
         S_dK = jnp.einsum('ijk, ijk -> ij', dK, (S_PQ[None, :, :]))
-        #S_dK = jnp.einsum('ijk, ijk -> ij', dK, (S_PQ[None, :, :] - S_PQ[:, None, :]))
         k_pq = d2K + S_dK + S_dK.T + K * jnp.dot(S_PQ, S_PQ.T)
         return k_pq
     
@@ -81,7 +80,6 @@ class KernelGradientDiscrepancy:
     #for extansible sampling 
     def minimized_function(self,X):
         n = len(X)
-        #print(self.k_pq.kernel_function(X)/2 )+ jnp.sum(self.k_pq.kernel_array(X)))
         return self.k_pq.kernel_function(X)/2 + jnp.sum(self.k_pq.kernel_array(X)) 
 
 
