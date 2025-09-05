@@ -35,12 +35,29 @@ def ddk_gauss(x, y, sigma):  # Gram matrix of nabla_2 . nabla_1 k(x,y), dim = (n
 ######## INVERSE MULTIQUADRIC KERNEL ########
 
 
-def k_IMQ(x,y,c):
+def k_IMQ(x,y,c,b):
     X_norm = jnp.sum(x**2, axis=1)
     Y_norm = jnp.sum(y**2, axis=1)
     xy = jnp.dot(x, y.T)
     dist = X_norm[:, None] + Y_norm[None, :] - 2 * xy
-    return 1/jnp.sqrt(c + dist)
+    return 1/jnp.sqrt(c + dist)**(-b)
+
+# Gram matrix of nabla_1 k(x,y), dim = (n,m,d)
+def dk_IMQ_dx(x, y, c, b):
+    # x: (n, d), y: (n, d)
+    # output: (n, n, d)
+
+    x_exp = x[:, None, :]       # (n, 1, d)
+    y_exp = y[None, :, :]       # (1, n, d)
+
+    diff = x_exp - y_exp        # (n, n, d)
+    dist_sq = jnp.sum(diff**2, axis=2)  # (n, n)
+
+    denom = (c + dist_sq) ** (-b / 2 - 1)  # (n, n)
+    grad = -b * diff * denom[:, :, None]  # (n, n, d)
+
+    return grad
+
 
 
 

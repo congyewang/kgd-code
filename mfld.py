@@ -16,7 +16,7 @@ import os
 class MeanFieldLangevinDynamics:
     def __init__(self,q0,L,k,gradL = None,grad_log_q0 = None):
         self.q0 = q0
-        if grad_log_q0 != None:
+        if grad_log_q0 == None:
             self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
             self.S_q0 = jit(vmap(grad(self.log_q0)))
         else:

@@ -32,20 +32,21 @@ class MLP(nnx.Module):
         self.activation = activation
 
     def __call__(self, x):
+        x_prop = x.copy()
         for layer in self.layers:
             if self.activation == "relu":
-                x = nnx.relu(x)
+                x_prop = nnx.relu(x_prop)
             elif self.activation == "tanh":
-                x = jnp.tanh(x)
+                x_prop = jnp.tanh(x_prop)
             elif self.activation == "sigmoid":
-                x = nnx.sigmoid(x)
+                x_prop = nnx.sigmoid(x_prop)
             elif self.activation == "elu":
-                x = nnx.elu(x)
+                x_prop = nnx.elu(x_prop)
             
-            x = layer(x)
+            x_prop = layer(x_prop)
+            # print(x.shape)
 
-
-        return self.out(x)
+        return 0.25 * self.out(x_prop) + x
 
 
 
@@ -62,12 +63,11 @@ class VariationalInference:
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
         #self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
         self.model_T = MLP(self.d, layers, self.d, activation_function, rngs=nnx.Rngs(0))
+        self.learning_rate = learning_rate
+        #self.model_T = jax.tree.map(lambda p: jnp.zeros_like(p), self.model_T)
 
-        # # Multiplier tous les paramètres par 10
-        # params = nnx.state(self.model_T, nnx.Param)
-        # scaled_params = jax.tree_map(lambda p: p * 5, params)
-        # nnx.update(self.model_T, scaled_params)
-        self.optimizer = nnx.Optimizer(self.model_T, optax.adam(1e-3), wrt=nnx.Param)
+        # Multiplier tous les paramètres par 10
+        self.optimizer = nnx.Optimizer(self.model_T, optax.adam(self.learning_rate), wrt=nnx.Param)
 
 
     def flatten_params(self,params):
@@ -86,22 +86,24 @@ class VariationalInference:
         params = nnx.state(model_T, nnx.Param)
         return  self.flatten_params(params),loss #
     
-    def run(self,T,key,n_sim = 100):
+    def run(self,T,key,n_sim = 50):
         Keys = random.split(key, T)
+        positions = []
         params = nnx.state(self.model_T, nnx.Param)
         flat_param0 = self.flatten_params(params)
         dim_theta = flat_param0.shape[0]
         Theta = jnp.zeros((T,dim_theta ))
         Loss = jnp.zeros((T,))
         for it in range(T):
-            if it % 100 == 0:
+            if it % 1000 == 0:
                 print(it)
-            key = Keys[it]
-            W = random.normal(key, shape=(n_sim, self.d))
+            key = Keys[0]
+            W = random.uniform(key, shape=(n_sim, self.d),minval = -7.0,maxval=7.0) #2.5*random.normal(key, shape=(n_sim, self.d))
             theta,loss = self.train_step(self.model_T, self.optimizer, W)
             Theta = Theta.at[it].set(theta)
             Loss = Loss.at[it].set(loss)
-        return Theta, Loss
+            positions.append(vmap(lambda w : self.model_T(w))(W))
+        return Theta, Loss, positions
             
 
 

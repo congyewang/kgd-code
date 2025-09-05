@@ -11,13 +11,20 @@ import time
 import os
 
 class ExtensibleSampling:
-    def __init__(self, q0, L, k):
+    def __init__(self, q0, L, k,gradL = None,grad_log_q0 = None):
         self.q0 = q0
         self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
-        self.S_q0 = jit(vmap(grad(self.log_q0)))
+        if grad_log_q0 == None:
+            self.log_q0 = jit(lambda x: jnp.log(self.q0(x)))
+            self.S_q0 = jit(vmap(grad(self.log_q0)))
+        else:
+            self.S_q0 = jit(vmap(grad_log_q0))
         self.L = L
         self.k = k
-        self.gradL = jit(grad(lambda X: jax.lax.stop_gradient(len(X)) * self.L(X)))
+        if gradL == None:
+            self.gradL = jit(grad(lambda X : jax.lax.stop_gradient(len(X)) * self.L(X)))
+        else:
+            self.gradL = gradL
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X))
         self.k_pq = GradientKernel(self.S_PQ, self.k)
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
@@ -35,7 +42,7 @@ class ExtensibleSampling:
                 KGD_grid = KGD_grid.at[i].set(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
             min_idx = jnp.argmin(KGD_grid)
         else:
-            n_samples =  10000
+            n_samples =  10**d
             delta = 1.0
             key = jax.random.PRNGKey(it)
 
