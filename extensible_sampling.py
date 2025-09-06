@@ -36,14 +36,14 @@ class ExtensibleSampling:
             axis = jnp.linspace(l, u, n_grid)
             #print(axis)
             meshes = jnp.meshgrid(*[axis]*d, indexing="ij")
-            grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d) + 1 * random.normal(jax.random.PRNGKey(it), shape=(n_grid**d, d))  # Adding small noise to avoid exact duplicates
+            grid_points = jnp.stack(meshes, axis=-1).reshape(-1, d) + 0.1 * random.normal(jax.random.PRNGKey(it), shape=(n_grid**d, d))  # Adding small noise to avoid exact duplicates
             KGD_grid = jnp.zeros(n_grid**d)
             for i in range(n_grid**d):
                 KGD_grid = KGD_grid.at[i].set(self.KGD.evaluate(jnp.concatenate((X, grid_points[i][None,:]), axis=0)))
             min_idx = jnp.argmin(KGD_grid)
         else:
             n_samples =  10**d
-            delta = 1.0
+            delta = 0.5
             key = jax.random.PRNGKey(it)
 
             comp_idx = random.randint(key, (n_samples,), minval=0, maxval=n)
@@ -61,7 +61,16 @@ class ExtensibleSampling:
                 )
             min_idx = jnp.argmin(KGD_grid)
         return grid_points[min_idx]
-    
+
+    def prior_search(self,X,n0,it):
+        d = X.shape[1]
+        key = jax.random.PRNGKey(it)
+        points = 0.25 * random.normal(key, (n0**d, d)) + jnp.array([-1.0,-3.0])
+        KGD_points = jnp.zeros(n0)
+        for i in range(n0**d):
+            KGD_points = KGD_points.at[i].set(self.KGD.evaluate(jnp.concatenate((X, points[i][None,:]), axis=0)))
+        min_idx = jnp.argmin(KGD_points)
+        return points[min_idx]
     
 
     def GD_search(self,X,N_it=5000,step_size=0.01):
@@ -86,4 +95,6 @@ class ExtensibleSampling:
                 X = X.at[it].set(self.grid_search(X[:it], l, u, n0, it))
             if min_research == "GD search":
                 X = X.at[it].set(self.GD_search(X[:it]))
+            if min_research == "prior_search":
+                X = X.at[it].set(self.prior_search(X[:it], n0, it))
         return X                        

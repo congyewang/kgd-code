@@ -48,6 +48,22 @@ class MLP(nnx.Module):
 
         return 0.25 * self.out(x_prop) + x
 
+class Model(nn.Module):
+    hidden_dim: int
+    d : int
+
+    @nn.compact
+    def __call__(self, x):
+        x_ = x.copy()
+        x = nn.Dense(self.hidden_dim)(x)
+        x = nn.elu(x)
+        x = nn.Dense(self.hidden_dim)(x)
+        x = nn.elu(x)
+        # z = nn.Dense(self.hidden_dim)(x)
+        # x = nn.elu(x)
+        x = nn.Dense(self.d)(x)
+        return (x + x_).squeeze()
+
 
 
 class VariationalInference:
@@ -62,7 +78,7 @@ class VariationalInference:
         self.k_pq = GradientKernel(self.S_PQ, k)
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
         #self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
-        self.model_T = MLP(self.d, layers, self.d, activation_function, rngs=nnx.Rngs(0))
+        self.model_T = Model(20,self.d) #MLP(self.d, layers, self.d, activation_function, rngs=nnx.Rngs(0))
         self.learning_rate = learning_rate
         #self.model_T = jax.tree.map(lambda p: jnp.zeros_like(p), self.model_T)
 

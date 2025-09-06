@@ -8,6 +8,7 @@ from functions import F_P, GradientKernel,KernelGradientDiscrepancy
 import jax_kernels as jk
 import jax
 from jax import random
+import optax 
 
 
 class GeneralizedSVGD:
@@ -28,19 +29,23 @@ class GeneralizedSVGD:
         self.m = m
         self.dm = dm
     
-    def run_particles(self, eta, T, X0,decrease_step_size = False):
+    def run_particles(self, eta, T, X0,optimise_stepsize= False):
         n, d = X0.shape
         
         device = X0.device  
         all_particles = jax.device_put(jnp.zeros((T, n, d)), device)
         X = X0.copy()
+        if optimise_stepsize:
+            optimizer = optax.adam(eta)
+            opt_state = optimizer.init(X)
 
         for it in range(T):
             phi = 1/n * (self.m(X,X) @ self.S_PQ(X) + jnp.sum(self.dm(X,X),axis = 0))
-            if decrease_step_size:
-                if (it+1) % 100 == 0:
-                    eta = eta/2.0
-            X = X + eta * phi
+            if optimise_stepsize:
+                updates, opt_state = optimizer.update(-phi, opt_state)
+                X = optax.apply_updates(X, updates)
+            else:
+                X = X + eta * phi
             all_particles = all_particles.at[it].set(X)
 
         return all_particles
