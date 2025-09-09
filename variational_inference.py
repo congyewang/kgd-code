@@ -33,7 +33,9 @@ class MLP(nnx.Module):
 
     def __call__(self, x):
         x_prop = x.copy()
-        for layer in self.layers:
+        for i,layer in enumerate(self.layers[1:]):
+            if i == 0:
+                x_prop = self.layers[0](x_prop)
             if self.activation == "relu":
                 x_prop = nnx.relu(x_prop)
             elif self.activation == "tanh":
@@ -46,7 +48,7 @@ class MLP(nnx.Module):
             x_prop = layer(x_prop)
             # print(x.shape)
 
-        return 0.25 * self.out(x_prop) + x
+        return  self.out(x_prop) + 0. * x
 
 class Model(nn.Module):
     hidden_dim: int
@@ -77,8 +79,8 @@ class VariationalInference:
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X))
         self.k_pq = GradientKernel(self.S_PQ, k)
         self.KGD = KernelGradientDiscrepancy(self.k_pq)
-        #self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
-        self.model_T = Model(20,self.d) #MLP(self.d, layers, self.d, activation_function, rngs=nnx.Rngs(0))
+        self.model_T = MLP(self.d,layers,self.d,activation_function, rngs=nnx.Rngs(0)) 
+        #self.model_T = Model(20,self.d) #MLP(self.d, layers, self.d, activation_function, rngs=nnx.Rngs(0))
         self.learning_rate = learning_rate
         #self.model_T = jax.tree.map(lambda p: jnp.zeros_like(p), self.model_T)
 
@@ -114,7 +116,7 @@ class VariationalInference:
             if it % 1000 == 0:
                 print(it)
             key = Keys[0]
-            W = random.uniform(key, shape=(n_sim, self.d),minval = -7.0,maxval=7.0) #2.5*random.normal(key, shape=(n_sim, self.d))
+            W = random.uniform(key, shape=(n_sim, self.d),minval = -6.0,maxval=6.0) #2.5*random.normal(key, shape=(n_sim, self.d))
             theta,loss = self.train_step(self.model_T, self.optimizer, W)
             Theta = Theta.at[it].set(theta)
             Loss = Loss.at[it].set(loss)
