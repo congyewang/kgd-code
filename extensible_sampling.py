@@ -65,7 +65,7 @@ class ExtensibleSampling:
     def prior_search(self,X,n0,it):
         d = X.shape[1]
         key = jax.random.PRNGKey(it)
-        points = 0.5 * random.normal(key, (n0**d, d)) + jnp.array([-1.0,-3.0])
+        points = 0.25 * random.normal(key, (n0**d, d)) + jnp.array([-1.0,-1.6])
         KGD_points = jnp.zeros(n0)
         for i in range(n0**d):
             KGD_points = KGD_points.at[i].set(self.KGD.evaluate(jnp.concatenate((X, points[i][None,:]), axis=0)))
