@@ -1,4 +1,4 @@
-This repository contains the code of the experiments presented in \hyperlin{https://arxiv.org/abs/2509.10393}.
+This repository contains the code of the experiments presented in https://arxiv.org/abs/2509.10393.
 
 # Reproduction of the experiments
 
