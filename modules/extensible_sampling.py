@@ -70,7 +70,7 @@ class ExtensibleSampling:
         return x
 
 
-    def run_particles(self,key,x0,T,min_search_method = "grid_search",settings = [-5,5,0.1,0.5]) :
+    def run_particles(self,key,x0,T,min_search_method = "grid_search",settings = [-5,5,0.1,0.5,20]) :
         d = len(x0)
         X = jnp.zeros((T, d))
         X = X.at[0].set(x0)

@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 from jax import jit, vmap, grad
 from jax import jacfwd, jacrev
 from jax.scipy.stats import multivariate_normal
-from functions import F_P, GradientKernel,KernelGradientDiscrepancy
-import jax_kernels as jk
+from modules.kgd_functions import F_P, GradientKernel,KernelGradientDiscrepancy
 import jax
 from jax import random
 import optax 

@@ -6,7 +6,7 @@ from jax import jit, vmap, grad
 from jax import jacfwd, jacrev
 from jax.scipy.stats import multivariate_normal
 import modules.kgd_functions as f
-from functions import F_P, GradientKernel,KernelGradientDiscrepancy
+from modules.kgd_functions import F_P, GradientKernel,KernelGradientDiscrepancy
 from jax import random
 import os
 from jax import grad, random,vmap,tree_util
@@ -44,7 +44,7 @@ class KGD_Descent:
             all_particles.append(X)
 
             if step % 10 == 0:
-                mse = self.L(X) / gamma   # if you want MSE logging
+                mse = self.L(X) / gamma   
                 print(f"Step {step}, loss = {loss_val}, mse = {mse}")
                 losses.append(loss_val)     
         return all_particles    

@@ -107,37 +107,57 @@ class F_P:
     def evaluate(self, X, num_samples = 50):
         KL = self.kl_divergence_kde(X,num_samples)
         return self.L(X) + KL
-    
+
+
+
+
+def MMD(x,y,k):
+    n = len(x)
+    K = lambda X,Y : vmap(lambda x1: vmap(lambda x2: k(x1, x2))(X))(Y)
+    Kxx = K(x,x)
+    Kyy = K(y,y)
+    Kxy = K(x,y)
+    A = 1/((n-1)*n) * (np.sum(Kxx) - np.sum(np.diag(Kxx)))
+    C = 1/((n-1)*n) * (np.sum(Kyy) - np.sum(np.diag(Kyy)))
+    B = 1/n**2* np.sum(Kxy)
+    return A - B + C
+
+############################
+######## KERNELS ###########
+############################   
 
 def k_imq(x, y, c, b, scale=1.):
     assert b > 0
     return (c**2 + (x-y).dot(x-y)/scale**2)**(-b)
 
 def imq_scale_mixtures(x, y, scales):
-  return  vmap(lambda scale: k_imq(x, y, 1, 0.5, scale))(scales).mean()
-        
-    
-class MLP(nn.Module):
-    hidden_dims: list[int]   
-    output_dim: int    
-    activation_function : str = "tanh"
+    return  vmap(lambda scale: k_imq(x, y, 1, 0.5, scale))(scales).mean()
 
-    @nn.compact
-    def __call__(self, x):
-        
-        for hdim in self.hidden_dims:
-            x = nn.Dense(hdim)(x)
-            if self.activation_function == "relu":
-                x = nn.relu(x)
-            elif self.activation_function == "tanh":
-                x = jnp.tanh(x)
-            elif self.activation_function == "sigmoid":
-                x = nn.sigmoid(x)
+def gaussian_kernel(x, y, sigma):
+    return jnp.exp(-(x-y).dot(x-y) / (2 * sigma ** 2))
 
-        x = nn.Dense(self.output_dim)(x)
-        return x.squeeze()
-        
+def matern_kernel(x, y, length_scale):
+    eps = 1e-14
+    d = ((x-y).dot(x-y) + eps )**0.5
+    return (1 + jnp.sqrt(3)*d / length_scale) * jnp.exp(-jnp.sqrt(3)*d / length_scale)
 
+######## Recommended kernel #########
+
+def k_lin (x,y,c):
+    return jnp.dot(x,y) + c**2
+
+def a_(x,s,c):
+    return (c**2 + jnp.sum((x)**2))**(s/2)
+
+def recommended_kernel(x,y,L,alpha,beta,c):
+    a_s_x = a_(x,alpha - beta,c)
+    a_s_y = a_(y,alpha - beta,c)
+    k_lin_xy = k_lin(x,y,c)/(k_lin(x,x,c)*k_lin(y,y,c))**0.5
+    return a_s_x*(L(x,y) + k_lin_xy)*a_s_y
+
+        
+############################################@
+        
 
 
 

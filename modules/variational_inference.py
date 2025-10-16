@@ -22,11 +22,10 @@ from flax import linen as nn
 # Pushforward map
 class Model(nn.Module):
     hidden_dim: int
-    output_dim: int = 4
+    output_dim: int = 1
 
     @nn.compact
     def __call__(self, x):
-        # return nn.Dense(self.output_dim)(x).squeeze()
         y = nn.Dense(self.hidden_dim)(x)
         y = nn.elu(y)
         y = nn.Dense(self.hidden_dim)(y)
@@ -34,7 +33,7 @@ class Model(nn.Module):
         y = nn.Dense(self.hidden_dim)(y)
         y = nn.elu(y)
         y = nn.Dense(self.output_dim)(y)
-        return  y.squeeze() #+x #  + nn.Dense(self.output_dim)(x)
+        return  y.squeeze() 
 
 
 
@@ -54,7 +53,7 @@ class VariationalInference:
         self.model_T = Model(layers_dim, self.d)
         self.tx = optax.adam(learning_rate=learning_rate)
         
-
+    #mu_0
     def noise_fn(self,key, shape):
         return random.uniform(key, shape, minval=-3, maxval=3)
     
@@ -71,9 +70,11 @@ class VariationalInference:
             Kyy = vmap(lambda x: vmap(lambda y: k(x, y))(target_samples))(target_samples)
             return (Kxx - 2*Kxy + Kyy).mean()
         
-        key, *(keys) = random.split(key, T_pretrain+1)
-        x = random.normal(key, (self.d,)) 
-        params = self.model_T.init(key, x)
+        key1, key2, *(keys) = random.split(key, T_pretrain+2)
+        x = random.normal(key1, (self.d,)) 
+        params = self.model_T.init(key2, x)
+        jax.tree_util.tree_map(lambda x: x.shape, params) # Checking output shapes
+        self.model_T.apply(params, x)
         opt_state = self.tx.init(params)
 
         for step in tqdm(range(T_pretrain)):
@@ -84,9 +85,8 @@ class VariationalInference:
         return params
 
     def l2_norm(self,params):
-        # sum of squared parameters over the whole pytree
         return sum([jnp.sum(jnp.square(p)) for p in jax.tree_util.tree_leaves(params)])
-    def loss(self,key, params, num_samples=100, d_noise=4, reg=1e+0
+    def loss(self,key, params, num_samples=100, d_noise=4, reg=0.0
         ):
         noise = self.noise_fn(key, (num_samples, d_noise))
         X = self.model_T.apply(params, noise)
@@ -104,19 +104,17 @@ class VariationalInference:
         X_kgd = self.model_T.apply(params, noise)
         
         schedule = optax.exponential_decay(
-        init_value=self.learning_rate,   # initial lr
+        init_value=self.learning_rate,  
         transition_steps=100,
         decay_rate=0.99
         )
         self.tx = optax.chain(
-            # optax.clip(10.0),
             optax.adam(learning_rate=self.learning_rate),
-            # optax.scale_by_learning_rate(schedule),
         )
         opt_state = self.tx.init(params)
         
 
-        loss_ = jit(lambda key, params: self.loss(key, params, num_samples=n, d_noise=self.d, reg=0.0))
+        loss_ = jit(lambda key, params: self.loss(key, params, num_samples=n, d_noise=self.d, reg=2.0))
 
         for step in tqdm(range(T)):
             key1,key2 = random.split(keys[step])
@@ -133,7 +131,7 @@ class VariationalInference:
             noise_kgd = self.noise_fn(key2, (n, self.d))
             X_kgd = self.model_T.apply(params, noise_kgd)
 
-            if step % 100 == 0:
+            if step % 1000 == 0:
                 X = self.model_T.apply(params, noise)
                 mse = self.L(X) / gamma
                 gradsize = (self.gradL(X)**2).sum() / gamma**2
