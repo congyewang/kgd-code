@@ -1,0 +1,13 @@
+setup.py
+experiments/__init__.py
+kgd_code.egg-info/PKG-INFO
+kgd_code.egg-info/SOURCES.txt
+kgd_code.egg-info/dependency_links.txt
+kgd_code.egg-info/top_level.txt
+modules/__init__.py
+modules/extensible_sampling.py
+modules/kgd_descent.py
+modules/kgd_functions.py
+modules/mfld.py
+modules/variational_gradient_descent.py
+modules/variational_inference.py
