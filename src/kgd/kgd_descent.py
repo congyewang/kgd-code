@@ -1,34 +1,59 @@
-import numpy as np
-import jax.numpy as jnp
+from typing import Callable
+
 import jax
-from tqdm import tqdm
-from jax import jit, vmap, grad
-from jax import jacfwd, jacrev
-from jax.scipy.stats import multivariate_normal
-import modules.kgd_functions as f
-from modules.kgd_functions import F_P, GradientKernel,KernelGradientDiscrepancy
-from jax import random
-import os
-from jax import grad, random,vmap,tree_util
-from jax.flatten_util import ravel_pytree
-from flax import traverse_util
-
 import optax
+from jax import grad, jit
+from jaxtyping import Array, Float
 
-import flax
-from flax import linen as nn
+from .kgd_functions import GradientKernel, KernelGradientDiscrepancy
+
 
 class KGD_Descent:
-    def __init__(self, grad_log_q0, L, k):
+    """
+    KGD Descent class that performs optimization to minimize the Kernel Gradient Discrepancy (KGD) using gradient descent.
+    """
+
+    def __init__(
+        self,
+        grad_log_q0: Callable[[Float[Array, "sample"]], Float[Array, "gradient"]],
+        L: Callable[[Float[Array, "sample"]], Float[Array, "loss"]],
+        k: Callable[[Float[Array, "x1"], Float[Array, "x2"]], Float[Array, "kernel"]],
+    ) -> None:
+        """
+        Initializes the KGD_Descent class.
+
+        Args:
+            grad_log_q0 (Callable[[Float[Array, "sample"]], Float[Array, "gradient"]]): Function to compute the gradient of the log density of the base distribution
+            L (Callable[[Float[Array, "sample"]], Float[Array, "loss"]]): Loss function
+            k (Callable[[Float[Array, "x1"], Float[Array, "x2"]], Float[Array, "kernel"]]): Kernel function
+        """
         self.S_q0 = grad_log_q0
         self.L = L
         self.gradL = jit(grad(lambda X: jax.lax.stop_gradient(len(X)) * self.L(X)))
         self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X))
         self.k = k
         self.k_pq = GradientKernel(self.S_PQ, self.k)
-        self.KGD = KernelGradientDiscrepancy(self.k_pq)   
+        self.KGD = KernelGradientDiscrepancy(self.k_pq)
 
-    def run_particles(self,X0,T, learning_rate=1e-2,gamma = 300):
+    def run_particles(
+        self,
+        X0: Float[Array, "n d"],
+        T: int,
+        learning_rate: float = 1e-2,
+        gamma: float = 300,
+    ) -> list[Float[Array, "n d"]]:
+        """
+        Runs the KGD descent optimization.
+
+        Args:
+            X0 (Float[Array, "n d"]): Initial particles
+            T (int): Number of optimization steps
+            learning_rate (float): Learning rate for the optimizer
+            gamma (float): Scaling factor for the loss computation
+
+        Returns:
+            list[Float[Array, "n d"]]: List of particles at each optimization step
+        """
         tx = optax.adam(learning_rate)
         opt_state = tx.init(X0)
         X = X0.copy()
@@ -44,7 +69,7 @@ class KGD_Descent:
             all_particles.append(X)
 
             if step % 10 == 0:
-                mse = self.L(X) / gamma   
+                mse = self.L(X) / gamma
                 print(f"Step {step}, loss = {loss_val}, mse = {mse}")
-                losses.append(loss_val)     
-        return all_particles    
+                losses.append(loss_val)
+        return all_particles

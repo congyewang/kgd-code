@@ -1,33 +1,62 @@
-import numpy as np
-import jax.numpy as jnp
-import matplotlib.pyplot as plt
+from typing import Callable, Optional
+
 import jax
-from jax import jit, vmap, grad
-from jax import jacfwd, jacrev
-from jax.scipy.stats import multivariate_normal
-from modules.kgd_functions import F_P, GradientKernel,KernelGradientDiscrepancy
-from jax import random
-import time
-import os
-
-
+import jax.numpy as jnp
+from jax import grad, jit, random
+from jaxtyping import Array, Float
 
 
 class MeanFieldLangevinDynamics:
-    def __init__(self,grad_log_q0,L,gradL = None,):
+    """
+    Mean-Field Langevin Dynamics sampler.
+    """
+
+    def __init__(
+        self,
+        grad_log_q0: Callable[[Float[Array, "n d"]], Float[Array, "n d"]],
+        L: Callable[[Float[Array, "n d"]], Float[Array, "n"]],
+        gradL: Optional[Callable[[Float[Array, "n d"]], Float[Array, "n d"]]] = None,
+    ) -> None:
+        """
+        Mean-Field Langevin Dynamics sampler.
+
+        Args:
+            grad_log_q0 (Callable[[Float[Array, "n d"]], Float[Array, "n d"]]): Function computing the gradient of the log-density of the initial distribution q0.
+            L (Callable[[Float[Array, "n d"]], Float[Array, "n"]]): Function computing the interaction potential.
+            gradL (Optional[Callable[[Float[Array, "n d"]], Float[Array, "n d"]]]): Optional function computing the gradient of the interaction potential. If None, it will be computed using automatic differentiation.
+        """
         self.S_q0 = jit(grad_log_q0)
         self.L = L
-        if gradL == None:
-            self.gradL = jit(grad(lambda X : jax.lax.stop_gradient(len(X)) * self.L(X)))
+        if gradL is None:
+            self.gradL = jit(grad(lambda X: jax.lax.stop_gradient(len(X)) * self.L(X)))
         else:
             self.gradL = gradL
-        self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X)) 
+        self.S_PQ = jit(lambda X: self.S_q0(X) - self.gradL(X))
 
-    def run_particles(self, eta, T, X0, key, noise=0):
-    
+    def run_particles(
+        self,
+        eta: float,
+        T: int,
+        X0: Float[Array, "n d"],
+        key: Float[Array, "key_dim"],
+        noise: float = 0,
+    ) -> Float[Array, "T n d"]:
+        """
+        Run the Mean-Field Langevin Dynamics sampler.
+
+        Args:
+            eta (float): Step size.
+            T (int): Number of iterations.
+            X0 (Float[Array, "n d"]): Initial particles of shape (n, d).
+            key (Float[Array, "key_dim"]): JAX random key.
+            noise (float): Additional noise term (default is 0).
+
+        Returns:
+            Float[Array, "T n d"]: Array of shape (T, n, d) containing the particles at each iteration.
+        """
         n, d = X0.shape
-        
-        device = X0.device  
+
+        device = X0.device
         all_particles = jax.device_put(jnp.zeros((T, n, d)), device)
         X = X0.copy()
 
@@ -39,10 +68,3 @@ class MeanFieldLangevinDynamics:
             all_particles = all_particles.at[it].set(X)
 
         return all_particles
-
-
-
-
-    
-
-        
